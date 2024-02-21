@@ -1,6 +1,8 @@
 import random
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 import uuid
 import os
@@ -8,6 +10,7 @@ import signal
 from flask import Flask, request, jsonify
 import threading
 import queue
+import psutil
 if os.name != 'nt':  # nix system
     signal.signal(signal.SIGCLD, signal.SIG_IGN)
 
@@ -29,6 +32,17 @@ def worker():
             if result is not None and result != '':
                 q.put(result)
 
+def terminate_crashpad_processes():
+    target_type = ['--type=crashpad-handler', '--type=renderer']
+
+    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if process.info['name'] == 'chrome.exe' and any(tt in process.info['cmdline'] for tt in target_type):
+            try:
+                psutil.Process(process.info['pid']).terminate()
+                print(f"Terminated (PID: {process.info['pid']})")
+            except Exception as e:
+                print(f"Error terminating (PID: {process.info['pid']}): {e}")
+
 def bypass_clf(xff=None):
     options = uc.ChromeOptions()
     #options.add_argument('--headless')
@@ -39,7 +53,16 @@ def bypass_clf(xff=None):
         driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': {'X-Forwarded-For': xff}})
     driver.execute_cdp_cmd("Network.setUserAgentOverride", {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0'})
     driver.execute_script(f'window.open("https://www.bing.com/turing/captcha/challenge?q=&iframeid=local-gen-{uuid.uuid4()}","_blank");') # open page in new tab
-    time.sleep(random.uniform(10,15))  # wait until page has loaded
+    #time.sleep(random.uniform(10,15))  # wait until page has loaded
+
+    driver.switch_to.window(driver.window_handles[-1])
+    try:
+        element = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "ctp-checkbox-label"))
+        )
+    except:
+        pass
+    
     try:
         driver.switch_to.window(window_name=driver.window_handles[0])   # print("switch to first tab")
         driver.close()  # close first tab
@@ -79,6 +102,7 @@ def bypass_clf(xff=None):
         except:
             pass
         driver.quit()
+        terminate_crashpad_processes()
         return cookie_Verified
 
 app = Flask(__name__)
