@@ -8,6 +8,7 @@ import signal
 from flask import Flask, request, jsonify
 import threading
 import queue
+import psutil
 if os.name != 'nt':  # nix system
     signal.signal(signal.SIGCLD, signal.SIG_IGN)
 
@@ -28,6 +29,17 @@ def worker():
             result = bypass_clf()
             if result is not None and result != '':
                 q.put(result)
+
+def terminate_crashpad_processes():
+    target_type = ['--type=crashpad-handler', '--type=renderer']
+
+    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if process.info['name'] == 'chrome.exe' and any(tt in process.info['cmdline'] for tt in target_type):
+            try:
+                psutil.Process(process.info['pid']).terminate()
+                print(f"Terminated (PID: {process.info['pid']})")
+            except Exception as e:
+                print(f"Error terminating (PID: {process.info['pid']}): {e}")
 
 def bypass_clf(xff=None):
     options = uc.ChromeOptions()
@@ -79,6 +91,7 @@ def bypass_clf(xff=None):
         except:
             pass
         driver.quit()
+        terminate_crashpad_processes()
         return cookie_Verified
 
 app = Flask(__name__)
