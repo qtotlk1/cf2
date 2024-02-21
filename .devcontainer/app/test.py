@@ -53,16 +53,7 @@ def bypass_clf(xff=None):
         driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {'headers': {'X-Forwarded-For': xff}})
     driver.execute_cdp_cmd("Network.setUserAgentOverride", {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0'})
     driver.execute_script(f'window.open("https://www.bing.com/turing/captcha/challenge?q=&iframeid=local-gen-{uuid.uuid4()}","_blank");') # open page in new tab
-    #time.sleep(random.uniform(10,15))  # wait until page has loaded
-
-    driver.switch_to.window(driver.window_handles[-1])
-    try:
-        element = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "ctp-checkbox-label"))
-        )
-    except:
-        pass
-    
+    time.sleep(random.uniform(10,15))  # wait until page has loaded
     try:
         driver.switch_to.window(window_name=driver.window_handles[0])   # print("switch to first tab")
         driver.close()  # close first tab
